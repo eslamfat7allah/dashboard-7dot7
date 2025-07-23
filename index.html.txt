@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة متابعة إطلاق مشروع 7dot7</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Chosen Palette: Warm Neutrals & Subtle Teal -->
+    <!-- Application Structure Plan: An interactive dashboard structure was chosen over a static list. The core components are: 1) A high-level summary panel with key charts (Overall Progress, Tasks per Phase) for an immediate overview. 2) A tab-based navigation system to filter tasks by phase, which prevents information overload and allows focused work. 3) Interactive "Task Cards" instead of table rows, with clickable status updates and an expandable details section. This structure transforms a passive checklist into an active project management tool, enhancing usability and engagement. -->
+    <!-- Visualization & Content Choices: 1) Overall Progress: A Donut Chart (Chart.js) was chosen to provide an instant, intuitive visualization of project completion. It's interactive, updating as tasks are completed. 2) Task Details: An expandable card (HTML/JS) was used for details and CEO tips. This follows the "progressive disclosure" principle, keeping the main view clean. 3) Task Status: Interactive checkboxes (HTML/JS) are used. This is a direct and familiar way for users to update status, which in turn updates the data model and the progress chart. 4) Phase Navigation: Clickable tabs (HTML/JS) filter the displayed tasks, which is a standard and highly effective pattern for organizing categorized content. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .task-card {
+            transition: all 0.3s ease-in-out;
+            border-right-width: 4px;
+        }
+        .task-card.status-done {
+            background-color: #f0fdf4; /* green-50 */
+            border-right-color: #22c55e; /* green-500 */
+        }
+        .task-card.status-not-started {
+            background-color: #fff;
+            border-right-color: #e5e7eb; /* gray-200 */
+        }
+        .task-card-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+        .task-card-details.open {
+            max-height: 500px;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-stone-900">لوحة متابعة إطلاق 7dot7</h1>
+            <p class="text-lg text-stone-600 mt-2">خارطة طريقكم التفاعلية من الفكرة إلى الافتتاح الكبير</p>
+        </header>
+
+        <main>
+            <!-- Summary Section -->
+            <section id="summary" class="mb-8 p-6 bg-white rounded-xl shadow-sm">
+                <h2 class="text-2xl font-bold mb-6 text-center">نظرة عامة على المشروع</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div class="chart-container">
+                        <canvas id="progressChart"></canvas>
+                    </div>
+                    <div class="flex flex-col justify-center items-center md:items-start">
+                        <div class="text-center md:text-right">
+                            <h3 class="text-xl font-bold text-stone-700">التقدم الإجمالي</h3>
+                            <p id="progressText" class="text-4xl font-bold text-teal-600 my-2">0%</p>
+                            <p id="tasksCompletedText" class="text-stone-500">0 من 16 مهمة تم إنجازها</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Navigation / Filters -->
+            <nav id="phase-filters" class="flex flex-wrap justify-center gap-2 mb-8">
+                <button data-phase="all" class="phase-btn bg-teal-600 text-white px-4 py-2 rounded-full font-semibold shadow">عرض الكل</button>
+                <button data-phase="1" class="phase-btn bg-white text-stone-700 px-4 py-2 rounded-full font-semibold shadow-sm">المرحلة 1: التأسيس</button>
+                <button data-phase="2" class="phase-btn bg-white text-stone-700 px-4 py-2 rounded-full font-semibold shadow-sm">المرحلة 2: التصميم</button>
+                <button data-phase="3" class="phase-btn bg-white text-stone-700 px-4 py-2 rounded-full font-semibold shadow-sm">المرحلة 3: التشغيل</button>
+                <button data-phase="4" class="phase-btn bg-white text-stone-700 px-4 py-2 rounded-full font-semibold shadow-sm">المرحلة 4: الإطلاق</button>
+            </nav>
+
+            <!-- Tasks Section -->
+            <section id="tasks-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Task cards will be injected here by JavaScript -->
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            const tasksData = [
+                { id: 1, phase: 1, title: 'التأسيس القانوني', responsible: 'ياسر', deadline: 'الأسبوع 2', status: 'not-started', details: '1. مراجعة وتوقيع "عقد الشركاء" مع المحامي.<br>2. تقديم أوراق تأسيس شركة "اليقين ش.ذ.م.م".<br>3. استخراج السجل التجاري والبطاقة الضريبية.', tip: 'لا توفروا في أتعاب المحامي الجيد؛ إنه استثمار في السرعة وتجنب المشاكل المستقبلية.' },
+                { id: 2, phase: 1, title: 'تأمين رأس المال', responsible: 'ياسر', deadline: 'الأسبوع 3', status: 'not-started', details: '1. فتح حساب بنكي تجاري باسم الشركة.<br>2. إيداع كل شريك حصته (1 مليون جنيه).<br>3. تفعيل صلاحية الاطلاع (Read-only) لك على الحساب.', tip: 'يجب أن تكون كل المعاملات المالية عبر حساب الشركة من اليوم الأول. افصلوا تماماً بين أموالكم الشخصية وأموال المشروع.' },
+                { id: 3, phase: 1, title: 'بناء هوية المشروع', responsible: 'أنت (تسويق)', deadline: 'الأسبوع 4', status: 'not-started', details: '1. كتابة "قصة العلامة التجارية" (Brand Story).<br>2. تصميم اللوجو النهائي ولوحة الألوان والخطوط.<br>3. تحديد "شخصية العميل المثالي" (Customer Persona).', tip: 'الهوية ليست مجرد لوجو. إنها الشعور الذي ينتاب العميل عندما يسمع اسم 7dot7. اجعلوه شعوراً بالفخامة والراحة.' },
+                { id: 4, phase: 1, title: 'تأمين الموقع', responsible: 'ياسر', deadline: 'الأسبوع 2', status: 'not-started', details: '1. توقيع عقد الإيجار النهائي للمحل باسم الشركة الجديدة.<br>2. التأكد من أن العقد يسمح بالنشاط التجاري (كوفي شوب).', tip: 'اقرأوا كل كلمة في عقد الإيجار. هل هناك أي قيود على ساعات العمل أو التعديلات الإنشائية؟' },
+                { id: 5, phase: 2, title: 'التصميم والتشطيب', responsible: 'مشترك', deadline: 'الأسبوع 10', status: 'not-started', details: '1. التعاقد مع مصمم داخلي ومقاول ذوي سمعة جيدة.<br>2. اعتماد التصميمات النهائية (3D Renders) والمخططات التنفيذية.<br>3. متابعة يومية لأعمال التشطيب (كهرباء، سباكة، ديكور).', tip: 'العقد مع المقاول يجب أن يتضمن جدولاً زمنياً صارماً وغرامات تأخير. زوروا الموقع بشكل مفاجئ لمراقبة جودة المواد والتنفيذ.' },
+                { id: 6, phase: 2, title: 'التراخيص الحكومية', responsible: 'ياسر', deadline: 'مستمر', status: 'not-started', details: '1. البدء فوراً في إجراءات ترخيص المحل (الحي، الدفاع المدني، الصحة).<br>2. تعيين متخصص "مخلّص تراخيص" لتسريع الإجراءات.', tip: 'لا تنتظروا انتهاء التشطيبات للبدء في التراخيص. ابدأوا بها بالتوازي. هذه هي عنق الزجاجة في معظم المشاريع.' },
+                { id: 7, phase: 2, title: 'شراء المعدات', responsible: 'ياسر', deadline: 'الأسبوع 8', status: 'not-started', details: '1. طلب وشراء ماكينة الإسبريسو والمطاحن.<br>2. شراء معدات المطبخ (ثلاجات، صانع ثلج، إلخ).<br>3. شراء وتركيب نظام نقاط البيع (POS)، الكاميرات، ونظام الصوت.', tip: 'استثمروا في "قلب المكان": ماكينة الإسبريسو. إنها ليست مجرد آلة، بل هي رسالة للعميل بأنكم تأخذون القهوة على محمل الجد.' },
+                { id: 8, phase: 2, title: 'شراء الأثاث', responsible: 'أنت (تسويق)', deadline: 'الأسبوع 9', status: 'not-started', details: '1. طلب الأثاث الداخلي والخارجي بناءً على التصميم المعتمد.<br>2. شراء وحدات الإضاءة والديكورات النهائية.', tip: 'يجب أن يكون الأثاث جميلاً ومريحاً وعملياً. اختبروا الجلوس على الكراسي بأنفسكم قبل الشراء.' },
+                { id: 9, phase: 3, title: 'تطوير قائمة المنتجات', responsible: 'مشترك', deadline: 'الأسبوع 12', status: 'not-started', details: '1. تحديد قائمة المشروبات والمأكولات النهائية.<br>2. عمل جلسات تذوق واختبار مكثفة.<br>3. حساب تكلفة كل عنصر بدقة (Food Costing) وتحديد سعر البيع.', tip: 'البساطة هي قمة الرقي. منيو صغير ومركز ومتقن أفضل من منيو كبير ومشتت. كل عنصر يجب أن يكون استثنائياً.' },
+                { id: 10, phase: 3, title: 'التعاقد مع الموردين', responsible: 'ياسر', deadline: 'الأسبوع 13', status: 'not-started', details: '1. اختيار مورد القهوة المختصة الرئيسي (شريك استراتيجي).<br>2. التعاقد مع موردي المخبوزات، الحليب، والمواد الخام الأخرى.<br>3. تصميم وطلب مواد التغليف (الأكواب، الأكياس) بالهوية التجارية.', tip: 'لا تعتمدوا أبداً على مورد واحد لأي منتج حيوي. يجب أن يكون لديكم دائماً "مورد احتياطي" جاهز لتجنب أي انقطاع.' },
+                { id: 11, phase: 3, title: 'بناء الفريق', responsible: 'ياسر وعبد الله', deadline: 'الأسبوع 12', status: 'not-started', details: '1. توظيف مدير التشغيل (عبد الله) بشكل رسمي.<br>2. توظيف فريق الباريستا (2-3 أفراد).<br>3. تصميم وتفصيل الزي الرسمي للفريق.', tip: 'وظفوا الشخصية ودربوا المهارة. ابحثوا عن الشغف في عيون المتقدمين. فريقكم هو الواجهة الأولى والأهم لعلامتكم التجارية.' },
+                { id: 12, phase: 3, title: 'التدريب المكثف', responsible: 'عبد الله', deadline: 'الأسبوع 14', status: 'not-started', details: '1. تدريب الفريق على تحضير كل عنصر في المنيو بإتقان.<br>2. تدريبهم على "قصة 7dot7" وفلسفة خدمة العملاء.<br>3. عمل محاكاة (Role-playing) لسيناريوهات مختلفة مع العملاء.', tip: 'كل فرد في الفريق يجب أن يكون قادراً على شرح الفرق بين أنواع القهوة المختلفة. حوّلوهم من عاملين إلى خبراء وسفراء.' },
+                { id: 13, phase: 4, title: 'حملة ما قبل الافتتاح', responsible: 'أنت (تسويق)', deadline: 'الأسبوع 15', status: 'not-started', details: '1. إطلاق صفحات انستجرام وفيسبوك.<br>2. نشر محتوى تشويقي (صور من وراء الكواليس، لمحات من الديكور).<br>3. التواصل مع مؤثرين صغار (Micro-influencers) لدعوتهم حصرياً.', tip: 'الغموض يولد الفضول. لا تكشفوا كل شيء مرة واحدة. اجعلوا الناس تتساءل: "ماذا يحدث في هذا المكان الرائع على النيل؟"' },
+                { id: 14, phase: 4, title: 'الافتتاح التجريبي', responsible: 'الفريق كاملاً', deadline: 'الأسبوع 15', status: 'not-started', details: '1. عمل افتتاح "داخلي" للأصدقاء والعائلة فقط (قبل 3-4 أيام).<br>2. اختبار سير العمل، سرعة الخدمة، ونظام الكاشير تحت ضغط.<br>3. جمع الملاحظات وتصحيح الأخطاء فوراً.', tip: 'هذا هو أهم يوم قبل الافتتاح الحقيقي. كن قاسياً في تقييمك. أي خطأ يحدث هنا يمكن إصلاحه بسهولة، أما أمام العملاء فتكلفته باهظة.' },
+                { id: 15, phase: 4, title: 'الاستعداد النهائي', responsible: 'عبد الله', deadline: 'الأسبوع 16', status: 'not-started', details: '1. التنظيف الشامل والنهائي للمكان.<br>2. استلام المخزون الأولي الكامل من جميع الموردين.<br>3. وضع اللمسات النهائية (موسيقى، رائحة المكان، تنسيق الزهور).', tip: 'التفاصيل هي التي تصنع الفرق بين الجيد والعظيم. امشوا في المكان بعين العميل الأكثر تطلباً. هل كل شيء مثالي؟' },
+                { id: 16, phase: 4, title: 'الافتتاح الكبير', responsible: 'مشترك', deadline: 'الأسبوع 16', status: 'not-started', details: '1. الإعلان عن موعد الافتتاح الرسمي.<br>2. التأكد من جاهزية الفريق وحماسه.<br>3. التواجد شخصياً للترحيب بأول العملاء.', tip: 'يوم الافتتاح ليس النهاية، بل هو البداية. هدفكم ليس الربح في هذا اليوم، بل كسب قلوب وعقول أول 100 عميل. هؤلاء هم جيشكم التسويقي الأول.' }
+            ];
+
+            const tasksContainer = document.getElementById('tasks-container');
+            const phaseFilters = document.getElementById('phase-filters');
+            let currentPhaseFilter = 'all';
+            let progressChart;
+
+            function renderTasks() {
+                tasksContainer.innerHTML = '';
+                const filteredTasks = tasksData.filter(task => 
+                    currentPhaseFilter === 'all' || task.phase == currentPhaseFilter
+                );
+
+                if (filteredTasks.length === 0) {
+                    tasksContainer.innerHTML = `<p class="text-center text-stone-500 col-span-full">لا توجد مهام في هذه المرحلة.</p>`;
+                    return;
+                }
+
+                filteredTasks.forEach(task => {
+                    const card = document.createElement('div');
+                    card.className = `task-card status-${task.status} p-4 rounded-lg shadow-md bg-white`;
+                    card.dataset.taskId = task.id;
+                    
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <h3 class="text-lg font-bold text-stone-800">${task.title}</h3>
+                            <div class="flex items-center">
+                                <input type="checkbox" data-task-id="${task.id}" class="task-status-checkbox h-5 w-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" ${task.status === 'done' ? 'checked' : ''}>
+                            </div>
+                        </div>
+                        <div class="text-sm text-stone-500 mt-2">
+                            <p>👤 <span class="font-semibold">${task.responsible}</span></p>
+                            <p>📅 <span class="font-semibold">${task.deadline}</span></p>
+                        </div>
+                        <button class="details-btn text-sm text-teal-600 font-semibold mt-4">عرض التفاصيل</button>
+                        <div class="task-card-details mt-4 pt-4 border-t border-gray-200">
+                            <h4 class="font-bold text-stone-700">التفاصيل الدقيقة:</h4>
+                            <p class="text-sm text-stone-600 mt-1">${task.details}</p>
+                            <h4 class="font-bold text-stone-700 mt-3">توصية القائد:</h4>
+                            <p class="text-sm text-amber-800 bg-amber-50 p-2 rounded-md mt-1 italic">"${task.tip}"</p>
+                        </div>
+                    `;
+                    tasksContainer.appendChild(card);
+                });
+            }
+
+            function updateProgress() {
+                const totalTasks = tasksData.length;
+                const completedTasks = tasksData.filter(t => t.status === 'done').length;
+                const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+                document.getElementById('progressText').textContent = `${progressPercentage}%`;
+                document.getElementById('tasksCompletedText').textContent = `${completedTasks} من ${totalTasks} مهمة تم إنجازها`;
+
+                progressChart.data.datasets[0].data = [completedTasks, totalTasks - completedTasks];
+                progressChart.update();
+            }
+
+            function setupChart() {
+                const ctx = document.getElementById('progressChart').getContext('2d');
+                progressChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['أنجزت', 'متبقية'],
+                        datasets: [{
+                            data: [0, tasksData.length],
+                            backgroundColor: ['#14b8a6', '#e5e7eb'],
+                            borderColor: ['#ffffff'],
+                            borderWidth: 4,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            phaseFilters.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    currentPhaseFilter = e.target.dataset.phase;
+                    document.querySelectorAll('.phase-btn').forEach(btn => {
+                        btn.classList.remove('bg-teal-600', 'text-white');
+                        btn.classList.add('bg-white', 'text-stone-700');
+                    });
+                    e.target.classList.add('bg-teal-600', 'text-white');
+                    e.target.classList.remove('bg-white', 'text-stone-700');
+                    renderTasks();
+                }
+            });
+
+            tasksContainer.addEventListener('click', (e) => {
+                const taskId = e.target.dataset.taskId;
+                if (e.target.classList.contains('task-status-checkbox')) {
+                    const task = tasksData.find(t => t.id == taskId);
+                    task.status = e.target.checked ? 'done' : 'not-started';
+                    e.target.closest('.task-card').className = `task-card status-${task.status} p-4 rounded-lg shadow-md bg-white`;
+                    updateProgress();
+                }
+
+                if (e.target.classList.contains('details-btn')) {
+                    const detailsEl = e.target.nextElementSibling;
+                    detailsEl.classList.toggle('open');
+                    e.target.textContent = detailsEl.classList.contains('open') ? 'إخفاء التفاصيل' : 'عرض التفاصيل';
+                }
+            });
+
+            setupChart();
+            renderTasks();
+            updateProgress();
+        });
+    </script>
+</body>
+</html>
